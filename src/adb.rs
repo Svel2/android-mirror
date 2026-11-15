@@ -417,9 +417,10 @@ if [ -z "$url" ]; then
 fi
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+mkdir -p "$tmp/out"
 curl -fsSL "$url" -o "$tmp/scrcpy.tar.gz"
-tar -xzf "$tmp/scrcpy.tar.gz" -C "$tmp" --strip-components=1
-cp -a "$tmp"/. '{target_str}/'
+tar -xzf "$tmp/scrcpy.tar.gz" -C "$tmp/out" --strip-components=1
+cp -a "$tmp/out"/. '{target_str}/'
 chmod +x '{target_str}/scrcpy' '{target_str}/adb' 2>/dev/null || true
 "#
     );
