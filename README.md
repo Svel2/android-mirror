@@ -1,75 +1,76 @@
+Bahasa Indonesia | [English](README.en.md)
+
 # Android Mirror
 
-Aplikasi desktop lintas platform (**Windows, Linux, macOS**) yang ringan dan minimalis untuk mirroring layar Android menggunakan **ADB** dan **scrcpy**, dibangun dengan **Rust** dan framework UI native [**Rune**](https://github.com/anomalyco/rune).
+Aplikasi desktop untuk menampilkan dan mengontrol layar Android lewat ADB dan scrcpy di Windows, Linux, dan macOS. Aplikasi ini memakai Rust dan framework UI [Rune](https://github.com/anomalyco/rune).
 
 <p align="center">
-  <img src="docs/preview.png" alt="Tampilan Android Mirror" width="460" />
+  <img src="docs/preview.png" alt="Tampilan antarmuka Android Mirror" width="460" />
 </p>
 
----
+## Cara cepat memakai (Windows)
 
-## Fitur Utama
+Unduh `android-mirror-v0.1.0-windows-x86_64.zip` dari halaman [Releases](https://github.com/Svel2/android-mirror/releases), ekstrak arsipnya, lalu jalankan `android-mirror-app.exe`.
 
-- **Plug & Play (Auto-Setup `adb` & `scrcpy`)**
-  Otomatis mendeteksi `adb`/`scrcpy` di sistem, atau menginstalnya dalam 1 klik:
-  - **Windows:** Mengunduh rilis resmi GitHub ke `%LOCALAPPDATA%\AndroidMirror\bin`.
-  - **Linux (`x86_64`):** Mengunduh tarball rilis resmi ke `~/.local/share/android-mirror/bin`.
-  - **macOS:** Menginstal otomatis melalui Homebrew (`brew install scrcpy android-platform-tools`).
-- **USB & Wireless (Wi-Fi) Mirroring**
-  - Pindah dari koneksi USB ke Wi-Fi (`tcpip 5555`) dengan 1 klik (*Pindah ke Wi-Fi*).
-  - Dukungan koneksi IP:Port manual (*Wireless Debugging* Android 11+).
-  - Deteksi merek perangkat otomatis (ikon SVG bawaan untuk Realme, Xiaomi/Redmi, Oppo, Vivo, Samsung, Google/Pixel, OnePlus, Poco, Asus, Honor, Huawei, Motorola, Sony).
-- **Monitoring Perangkat Real-Time**
-  Menampilkan **CPU Usage (%)**, **GPU Usage (%)** *(jika diizinkan oleh sistem/kernel non-root)*, serta **Suhu Baterai (°C) & Level Baterai (%)** langsung di kartu perangkat.
-- **Mode Jendela Mirroring Fleksibel**
-  - **Standar:** Bar judul bawaan sistem (dengan dark title bar otomatis di Windows 10/11).
-  - **Borderless / Rounded (`Windows`):** Sudut jendela melengkung (*rounded*) dengan bar atas tipis (`26 px`) yang dapat di-drag, di-minimize, dan di-close, serta sinkron otomatis dengan *Z-order* Windows. Di Linux & macOS menggunakan mode `--window-borderless`.
-- **Preset Kualitas & Opsi Lengkap**
-  - Preset kualitas: **Ringan** (`720p • 30 fps`), **Seimbang** (`1080p • 60 fps`), dan **Tajam** (`Resolusi asli • 60 fps`).
-  - Matikan layar fisik HP saat mirroring (`--turn-screen-off`), jaga tetap menyala (`--stay-awake`), selalu di atas (*Always on top*), dan teruskan audio HP ke PC.
-  - Tombol **Bangunkan HP** (`KEYCODE_WAKEUP`) & **Tips Lockscreen** (panduan *Blind Unlock* dan catatan `FLAG_SECURE`).
-- **System Tray & Auto-Cleanup**
-  Menutup jendela aplikasi akan meminimalkannya ke System Tray tanpa memutus sesi; keluar lewat menu Tray (*Keluar*) otomatis menghentikan proses `scrcpy` yang aktif.
+Jika `scrcpy` atau `adb` belum ada di komputer Anda, klik **Install scrcpy** pada jendela aplikasi. Pengguna Linux dan macOS dapat mengompilasi aplikasi dari kode sumber lewat langkah pada bagian [Build dari source](#build-dari-source).
 
----
+## Fitur dan perilaku aplikasi
 
-## Struktur Proyek
+### Deteksi dan setup ADB/scrcpy
+Saat dibuka, aplikasi mencari biner `scrcpy` dan `adb` di folder `bin/scrcpy` sebelah program, direktori data aplikasi pengguna, jalur Homebrew macOS (`/opt/homebrew/bin` dan `/usr/local/bin`), serta `PATH` sistem.
 
-```text
-android-mirror-app/
-├── assets/
-│   └── brands/          # Ikon SVG merek perangkat Android (di-embed saat build)
-├── docs/
-│   ├── preview.png      # Screenshot tampilan aplikasi
-│   └── prototype.html   # Prototipe interaktif UI (HTML/CSS)
-├── src/
-│   ├── main.rs          # UI Rune, state management, background polling & system tray
-│   ├── adb.rs           # Integrasi ADB/scrcpy, installer otomatis & telemetry HP
-│   └── win.rs           # Kustomisasi jendela Win32 (dark bar, rounded thin bar, work-area center)
-├── build.rs             # Code generator untuk meng-embed assets/brands/*.svg
-├── Cargo.toml           # Konfigurasi crate & dependensi Rune
-├── Cargo.lock
-├── LICENSE
-└── README.md
-```
+Saat tombol **Install scrcpy** ditekan, aplikasi menjalankan metode instalasi sesuai sistem operasi:
 
----
+| Sistem operasi | Tujuan instalasi / perintah |
+| :--- | :--- |
+| Windows | Mengunduh rilis terbaru `Genymobile/scrcpy` dari GitHub ke `%LOCALAPPDATA%\AndroidMirror\bin\scrcpy`. |
+| Linux (`x86_64`) | Mengunduh arsip `scrcpy-linux-x86_64` ke `$XDG_DATA_HOME/android-mirror/bin/scrcpy` atau `~/.local/share/android-mirror/bin/scrcpy`. Untuk arsitektur lain, pasang via manajer paket distro seperti `sudo apt install scrcpy adb`. |
+| macOS | Menjalankan `brew install scrcpy android-platform-tools` melalui Homebrew. |
+
+### Koneksi USB, Wi-Fi, dan telemetry perangkat
+Perangkat USB yang terhubung tampil beserta ikon merek dari `assets/brands/*.svg` (Realme, Xiaomi/Redmi, OPPO, Vivo, Samsung, Google/Pixel, OnePlus, Poco, Asus, Honor, Huawei, Motorola, Sony, dan ikon Android umum).
+
+Pada kartu perangkat yang terhubung, Anda bisa:
+- Memindah koneksi USB ke Wi-Fi dalam satu klik lewat tombol **Pindah ke Wi-Fi** (menjalankan `adb tcpip 5555` lalu menyambung ke IP Wi-Fi ponsel), atau memasukkan `IP:Port` secara manual untuk Wireless Debugging (Android 11+).
+- Melihat pemakaian CPU (`%`), GPU (`%` bila sistem Android mengizinkan baca tanpa root), level baterai (`%`), dan suhu baterai (`°C`).
+- Menyalakan layar ponsel dari jarak jauh dengan tombol **Bangunkan HP** (`KEYCODE_WAKEUP`).
+
+### Kualitas video dan opsi jendela
+Bagian `PENGATURAN` menyediakan tiga preset kualitas serta beberapa opsi kontrol jendela:
+
+| Preset UI | Resolusi & FPS | Flag scrcpy |
+| :--- | :--- | :--- |
+| Ringan | `720p`, `30 fps` | `-m 1280 -b 4M --max-fps 30` |
+| Seimbang | `1080p`, `60 fps` | `-m 1920 -b 8M --max-fps 60` |
+| Tajam | Resolusi asli, `60 fps` | `-b 16M --max-fps 60` |
+
+Opsi lain di panel pengaturan:
+- **Matikan layar HP** (`--turn-screen-off`) menggelapkan layar fisik ponsel selama kontrol dari PC berlangsung.
+- **Jaga HP tetap menyala** (`--stay-awake`) menahan perangkat agar tidak tidur saat terhubung.
+- **Selalu di atas (Always on top)** (`--always-on-top`) menjaga jendela mirror berada di atas jendela lain.
+- **Teruskan audio HP ke PC** aktif secara bawaan; mematikan opsi ini meneruskan flag `--no-audio`.
+- **Jendela mirror rounded (borderless)** di Windows membulatkan sudut jendela dan menambahkan bar seret tipis setinggi `26 px` (lengkap dengan tombol minimize dan close) yang mengikuti Z-order Windows, sementara mode standar memakai dark title bar Windows 10/11. Di Linux dan macOS, opsi **Jendela mirror borderless** meneruskan `--window-borderless`.
+
+Menutup jendela utama mengecilkan aplikasi ke System Tray tanpa memutus sesi `scrcpy`. Memilih **Keluar** pada menu Tray menghentikan seluruh proses `scrcpy` aktif sebelum aplikasi ditutup.
 
 ## Prasyarat
 
-1. **OS yang didukung:** Windows 10/11, Linux (X11/Wayland), atau macOS.
-2. **HP Android dengan USB Debugging aktif:**
-   - Buka *Setelan → Tentang ponsel → ketuk Nomor Build 7x*.
-   - Masuk ke *Opsi Pengembang* → aktifkan **USB Debugging**.
-   - **Khusus HP Realme / OPPO (ColorOS):** Aktifkan juga **Disable permission monitoring** di paling bawah menu *Opsi Pengembang* agar kontrol input dan *clipboard sync* berfungsi normal.
-3. **Jika build dari source:** [Rust toolchain](https://rustup.rs/).
-   - **Windows:** Visual Studio C++ Build Tools (MSVC target).
-   - **Linux (Ubuntu/Debian):** `sudo apt install pkg-config libxkbcommon-dev libwayland-dev libgl1-mesa-dev libvulkan1`
-   - **macOS:** Xcode Command Line Tools (`xcode-select --install`).
+### Pengaturan HP Android
+1. Buka `Setelan > Tentang ponsel`, lalu ketuk `Nomor Build` 7 kali untuk mengaktifkan `Opsi Pengembang`.
+2. Aktifkan `USB Debugging`.
+3. Khusus perangkat realme / OPPO (ColorOS) atau Xiaomi, aktifkan juga `Disable permission monitoring` atau `USB Debugging (Security Settings)` di dalam Opsi Pengembang agar kontrol keyboard, mouse, dan sinkronisasi clipboard berjalan normal.
 
----
+### Dependensi build dari source
+Pasang [Rust toolchain](https://rustup.rs/) (crate memakai Rust edition `2024`) serta perkakas sistem masing-masing OS:
+- Windows: Visual Studio C++ Build Tools (target MSVC).
+- Linux (Ubuntu/Debian):
+  ```sh
+  sudo apt-get update
+  sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libgl1-mesa-dev libvulkan1
+  ```
+- macOS: Xcode Command Line Tools (`xcode-select --install`).
 
-## Build & Menjalankan dari Source
+## Build dari source
 
 ```sh
 git clone https://github.com/Svel2/android-mirror.git
@@ -77,7 +78,7 @@ cd android-mirror
 cargo build --release
 ```
 
-Setelah selesai, jalankan file binary hasil kompilasi:
+Jalankan binary hasil kompilasi:
 
 ```sh
 # Windows
@@ -87,22 +88,38 @@ Setelah selesai, jalankan file binary hasil kompilasi:
 ./target/release/android-mirror-app
 ```
 
-Atau langsung jalankan dalam mode development:
+Untuk langsung menjalankan versi development tanpa build rilis, pakai `cargo run`.
 
-```sh
-cargo run
+## Shortcut dan tips penggunaan
+
+- `scrcpy` menyinkronkan clipboard antara PC dan Android secara dua arah: tekan `Ctrl + V` di jendela mirror untuk menempel teks, atau `Ctrl + Shift + V` untuk menyalin isi clipboard PC ke clipboard ponsel.
+- Tekan `Alt + O` di jendela mirror saat ingin mematikan layar fisik ponsel tanpa menguncinya.
+- Android memblokir tampilan layar kunci dan aplikasi perbankan tertentu (`FLAG_SECURE`) sehingga jendela mirror tampak hitam saat lockscreen aktif. Anda dapat membuka panel **Tips Lockscreen** di aplikasi atau mengetik PIN lewat keyboard PC: tekan `Spasi`, ketik PIN Anda, lalu tekan `Enter`.
+
+## Struktur proyek
+
+```text
+android-mirror/
+├── .github/workflows/
+│   ├── build.yml        # Workflow build manual Windows, Linux, dan macOS
+│   └── release.yml      # Workflow rilis manual lintas platform
+├── assets/
+│   └── brands/          # Ikon SVG merek perangkat (di-embed oleh build.rs)
+├── docs/
+│   ├── preview.png      # Tangkapan layar aplikasi
+│   └── prototype.html   # Prototipe antarmuka awal (HTML/CSS)
+├── src/
+│   ├── main.rs          # Antarmuka Rune, state, polling perangkat, dan System Tray
+│   ├── adb.rs           # Integrasi ADB/scrcpy, auto-installer, dan telemetry HP
+│   └── win.rs           # Kustomisasi jendela Win32 (dark title bar & rounded thin bar)
+├── build.rs             # Script pembuat modul ikon merek saat kompilasi
+├── Cargo.toml           # Manifest crate dan dependensi Rune
+├── Cargo.lock
+├── LICENSE
+├── README.md
+└── README.en.md
 ```
-
----
-
-## Shortcut & Catatan Penggunaan
-
-- **Clipboard Sync (Copy/Paste 2 Arah):** Sudah aktif bawaan `scrcpy`. Teks yang di-**Copy** di HP otomatis masuk ke clipboard Windows (`Ctrl + V`), dan teks yang di-copy di Windows bisa di-paste ke HP dengan `Ctrl + V` (atau `Ctrl + Shift + V` untuk menyalin ke clipboard HP saja).
-- **Mematikan / Menyalakan Layar Mirror:** Tekan `Alt + O` pada jendela mirroring untuk mematikan layar fisik HP tanpa mengunci HP.
-- **Layar Hitam Saat Lockscreen (`FLAG_SECURE`):** Android memblokir tampilan layar kunci dan aplikasi perbankan untuk keamanan. Gunakan *Blind Unlock* dari keyboard PC (**Spasi** → ketik **PIN** → **Enter**) atau hindari menekan tombol Power fisik saat mirroring berlangsung.
-
----
 
 ## Lisensi
 
-Proyek ini dirilis di bawah lisensi [MIT](LICENSE).
+Tersedia di bawah lisensi [MIT](LICENSE).
