@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 
 mod adb;
 mod win;
@@ -43,6 +43,12 @@ fn kill_active_mirror() {
                 .creation_flags(0x0800_0000)
                 .status();
         }
+        #[cfg(unix)]
+        {
+            let _ = Command::new("kill")
+                .args(["-TERM", &pid.to_string()])
+                .status();
+        }
     }
 }
 
@@ -82,10 +88,32 @@ struct State {
 }
 
 fn tips_flag_path() -> PathBuf {
-    let base = std::env::var_os("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    base.join("AndroidMirror").join("tips_seen.flag")
+    #[cfg(target_os = "windows")]
+    {
+        let base = std::env::var_os("LOCALAPPDATA")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
+        return base.join("AndroidMirror").join("tips_seen.flag");
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let base = std::env::var_os("HOME")
+            .map(|h| PathBuf::from(h).join("Library").join("Application Support"))
+            .unwrap_or_else(|| PathBuf::from("."));
+        return base.join("AndroidMirror").join("tips_seen.flag");
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let base = std::env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config"))
+            })
+            .unwrap_or_else(|| PathBuf::from("."));
+        return base.join("android-mirror").join("tips_seen.flag");
+    }
+    #[allow(unreachable_code)]
+    PathBuf::from("tips_seen.flag")
 }
 
 fn is_first_run() -> bool {
@@ -565,7 +593,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 .gap(2.0)
                 .child(text("Android Mirror").font(type_::TITLE).color(k.c.text_base))
                 .child(
-                    text("Simple setup untuk Windows 10")
+                    text("Simple setup • USB & Wi-Fi")
                         .font(k.ty.small)
                         .color(k.c.text_faint),
                 ),
@@ -909,8 +937,16 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
         ))
         .child(Divider::horizontal().build(&k))
         .child(setting_row(
-            "Jendela mirror rounded (borderless)",
-            Some("Sudut melengkung dengan bar atas tipis (drag, minimize, close)"),
+            if cfg!(windows) {
+                "Jendela mirror rounded (borderless)"
+            } else {
+                "Jendela mirror borderless"
+            },
+            Some(if cfg!(windows) {
+                "Sudut melengkung dengan bar atas tipis (drag, minimize, close)"
+            } else {
+                "Tampilan bersih tanpa bar judul jendela (--window-borderless)"
+            }),
             s.rounded_window,
             &k,
             |s| s.rounded_window = !s.rounded_window,

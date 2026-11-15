@@ -2,7 +2,7 @@
 name = "android-mirror-app"
 version = "0.1.0"
 edition = "2024"
-description = "Minimalist Windows GUI app for Android screen mirroring via ADB and scrcpy, built with Rune"
+description = "Minimalist cross-platform GUI app for Android screen mirroring via ADB and scrcpy, built with Rust & Rune"
 license = "MIT"
 repository = "https://github.com/Svel2/android-mirror"
 

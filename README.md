@@ -1,6 +1,6 @@
 # Android Mirror
 
-Aplikasi desktop Windows yang ringan dan minimalis untuk mirroring layar Android ke PC menggunakan **ADB** dan **scrcpy**, dibangun dengan **Rust** dan framework UI native [**Rune**](https://github.com/anomalyco/rune).
+Aplikasi desktop lintas platform (**Windows, Linux, macOS**) yang ringan dan minimalis untuk mirroring layar Android menggunakan **ADB** dan **scrcpy**, dibangun dengan **Rust** dan framework UI native [**Rune**](https://github.com/anomalyco/rune).
 
 <p align="center">
   <img src="docs/preview.png" alt="Tampilan Android Mirror" width="460" />
@@ -11,7 +11,10 @@ Aplikasi desktop Windows yang ringan dan minimalis untuk mirroring layar Android
 ## Fitur Utama
 
 - **Plug & Play (Auto-Setup `adb` & `scrcpy`)**
-  Otomatis mendeteksi instalasi `adb`/`scrcpy` di sistem, atau mengunduhnya langsung dari rilis resmi GitHub dalam 1 klik (`%LOCALAPPDATA%\AndroidMirror\bin`).
+  Otomatis mendeteksi `adb`/`scrcpy` di sistem, atau menginstalnya dalam 1 klik:
+  - **Windows:** Mengunduh rilis resmi GitHub ke `%LOCALAPPDATA%\AndroidMirror\bin`.
+  - **Linux (`x86_64`):** Mengunduh tarball rilis resmi ke `~/.local/share/android-mirror/bin`.
+  - **macOS:** Menginstal otomatis melalui Homebrew (`brew install scrcpy android-platform-tools`).
 - **USB & Wireless (Wi-Fi) Mirroring**
   - Pindah dari koneksi USB ke Wi-Fi (`tcpip 5555`) dengan 1 klik (*Pindah ke Wi-Fi*).
   - Dukungan koneksi IP:Port manual (*Wireless Debugging* Android 11+).
@@ -19,8 +22,8 @@ Aplikasi desktop Windows yang ringan dan minimalis untuk mirroring layar Android
 - **Monitoring Perangkat Real-Time**
   Menampilkan **CPU Usage (%)**, **GPU Usage (%)** *(jika diizinkan oleh sistem/kernel non-root)*, serta **Suhu Baterai (°C) & Level Baterai (%)** langsung di kartu perangkat.
 - **Mode Jendela Mirroring Fleksibel**
-  - **Standar (Dark Title Bar):** Bar judul gelap Windows 10 dengan nama perangkat, tombol minimize, dan close.
-  - **Rounded Borderless + Thin Bar:** Sudut jendela melengkung (*rounded*) dengan bar atas tipis (`26 px`) yang dapat di-drag, di-minimize, dan di-close, serta sinkron otomatis dengan *Z-order* Windows.
+  - **Standar:** Bar judul bawaan sistem (dengan dark title bar otomatis di Windows 10/11).
+  - **Borderless / Rounded (`Windows`):** Sudut jendela melengkung (*rounded*) dengan bar atas tipis (`26 px`) yang dapat di-drag, di-minimize, dan di-close, serta sinkron otomatis dengan *Z-order* Windows. Di Linux & macOS menggunakan mode `--window-borderless`.
 - **Preset Kualitas & Opsi Lengkap**
   - Preset kualitas: **Ringan** (`720p • 30 fps`), **Seimbang** (`1080p • 60 fps`), dan **Tajam** (`Resolusi asli • 60 fps`).
   - Matikan layar fisik HP saat mirroring (`--turn-screen-off`), jaga tetap menyala (`--stay-awake`), selalu di atas (*Always on top*), dan teruskan audio HP ke PC.
@@ -54,18 +57,21 @@ android-mirror-app/
 
 ## Prasyarat
 
-1. **Windows 10 / 11 (64-bit)**.
+1. **OS yang didukung:** Windows 10/11, Linux (X11/Wayland), atau macOS.
 2. **HP Android dengan USB Debugging aktif:**
    - Buka *Setelan → Tentang ponsel → ketuk Nomor Build 7x*.
    - Masuk ke *Opsi Pengembang* → aktifkan **USB Debugging**.
    - **Khusus HP Realme / OPPO (ColorOS):** Aktifkan juga **Disable permission monitoring** di paling bawah menu *Opsi Pengembang* agar kontrol input dan *clipboard sync* berfungsi normal.
-3. **Jika build dari source:** [Rust toolchain](https://rustup.rs/) (MSVC target di Windows).
+3. **Jika build dari source:** [Rust toolchain](https://rustup.rs/).
+   - **Windows:** Visual Studio C++ Build Tools (MSVC target).
+   - **Linux (Ubuntu/Debian):** `sudo apt install pkg-config libxkbcommon-dev libwayland-dev libgl1-mesa-dev libvulkan1`
+   - **macOS:** Xcode Command Line Tools (`xcode-select --install`).
 
 ---
 
 ## Build & Menjalankan dari Source
 
-```powershell
+```sh
 git clone https://github.com/Svel2/android-mirror.git
 cd android-mirror
 cargo build --release
@@ -73,13 +79,17 @@ cargo build --release
 
 Setelah selesai, jalankan file binary hasil kompilasi:
 
-```powershell
+```sh
+# Windows
 .\target\release\android-mirror-app.exe
+
+# Linux / macOS
+./target/release/android-mirror-app
 ```
 
 Atau langsung jalankan dalam mode development:
 
-```powershell
+```sh
 cargo run
 ```
 

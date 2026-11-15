@@ -41,11 +41,56 @@ pub struct MirrorOptions {
     pub rounded_window: bool,
 }
 
+#[cfg(windows)]
+const SCRCPY_BIN: &str = "scrcpy.exe";
+#[cfg(not(windows))]
+const SCRCPY_BIN: &str = "scrcpy";
+
+#[cfg(windows)]
+const ADB_BIN: &str = "adb.exe";
+#[cfg(not(windows))]
+const ADB_BIN: &str = "adb";
+
 fn silent_cmd(program: &Path) -> Command {
     let mut cmd = Command::new(program);
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
     cmd
+}
+
+fn app_data_bin_dir() -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        return env::var_os("LOCALAPPDATA")
+            .map(|p| PathBuf::from(p).join("AndroidMirror").join("bin").join("scrcpy"));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        return env::var_os("HOME").map(|p| {
+            PathBuf::from(p)
+                .join("Library")
+                .join("Application Support")
+                .join("AndroidMirror")
+                .join("bin")
+                .join("scrcpy")
+        });
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        if let Some(xdg) = env::var_os("XDG_DATA_HOME") {
+            return Some(PathBuf::from(xdg).join("android-mirror").join("bin").join("scrcpy"));
+        }
+        return env::var_os("HOME").map(|p| {
+            PathBuf::from(p)
+                .join(".local")
+                .join("share")
+                .join("android-mirror")
+                .join("bin")
+                .join("scrcpy")
+        });
+    }
+    #[allow(unreachable_code)]
+    None
 }
 
 pub fn local_bin_dir() -> PathBuf {
@@ -57,14 +102,48 @@ pub fn local_bin_dir() -> PathBuf {
             }
         }
     }
-    env::current_dir()
+    let cwd_bin = env::current_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("bin")
-        .join("scrcpy")
+        .join("scrcpy");
+    if cwd_bin.exists() {
+        return cwd_bin;
+    }
+    app_data_bin_dir().unwrap_or(cwd_bin)
+}
+
+fn candidate_bin_dirs() -> Vec<PathBuf> {
+    let mut dirs = vec![local_bin_dir()];
+    if let Ok(exe) = env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let p = dir.join("bin").join("scrcpy");
+            if !dirs.contains(&p) {
+                dirs.push(p);
+            }
+        }
+    }
+    if let Some(app_dir) = app_data_bin_dir() {
+        if !dirs.contains(&app_dir) {
+            dirs.push(app_dir);
+        }
+    }
+    let cwd_bin = env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("bin")
+        .join("scrcpy");
+    if !dirs.contains(&cwd_bin) {
+        dirs.push(cwd_bin);
+    }
+    dirs
 }
 
 fn which(name: &str) -> Option<PathBuf> {
-    let mut cmd = Command::new("where");
+    #[cfg(windows)]
+    let finder = "where";
+    #[cfg(not(windows))]
+    let finder = "which";
+
+    let mut cmd = Command::new(finder);
     cmd.arg(name);
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
@@ -80,21 +159,78 @@ fn which(name: &str) -> Option<PathBuf> {
 }
 
 pub fn find_scrcpy() -> Option<PathBuf> {
-    let local = local_bin_dir().join("scrcpy.exe");
-    if local.is_file() {
-        return Some(local);
+    for dir in candidate_bin_dirs() {
+        let candidate = dir.join(SCRCPY_BIN);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    #[cfg(target_os = "macos")]
+    for p in ["/opt/homebrew/bin/scrcpy", "/usr/local/bin/scrcpy"] {
+        let path = PathBuf::from(p);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    #[cfg(target_os = "linux")]
+    for p in ["/usr/bin/scrcpy", "/usr/local/bin/scrcpy", "/snap/bin/scrcpy"] {
+        let path = PathBuf::from(p);
+        if path.is_file() {
+            return Some(path);
+        }
     }
     which("scrcpy")
 }
 
 pub fn find_adb() -> Option<PathBuf> {
-    let local = local_bin_dir().join("adb.exe");
-    if local.is_file() {
-        return Some(local);
+    for dir in candidate_bin_dirs() {
+        let candidate = dir.join(ADB_BIN);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
     }
-    let sdk_default = PathBuf::from(r"C:\Android\sdk\platform-tools\adb.exe");
-    if sdk_default.is_file() {
-        return Some(sdk_default);
+    #[cfg(target_os = "windows")]
+    {
+        let sdk_default = PathBuf::from(r"C:\Android\sdk\platform-tools\adb.exe");
+        if sdk_default.is_file() {
+            return Some(sdk_default);
+        }
+        if let Some(local) = env::var_os("LOCALAPPDATA") {
+            let p = PathBuf::from(local).join("Android").join("Sdk").join("platform-tools").join("adb.exe");
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(home) = env::var_os("HOME") {
+            let p = PathBuf::from(home).join("Library/Android/sdk/platform-tools/adb");
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+        for p in ["/opt/homebrew/bin/adb", "/usr/local/bin/adb"] {
+            let path = PathBuf::from(p);
+            if path.is_file() {
+                return Some(path);
+            }
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(home) = env::var_os("HOME") {
+            let p = PathBuf::from(home).join("Android/Sdk/platform-tools/adb");
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+        for p in ["/usr/bin/adb", "/usr/local/bin/adb"] {
+            let path = PathBuf::from(p);
+            if path.is_file() {
+                return Some(path);
+            }
+        }
     }
     which("adb")
 }
@@ -203,6 +339,7 @@ pub fn list_devices(adb: &Path) -> Vec<AndroidDevice> {
     devices
 }
 
+#[cfg(target_os = "windows")]
 pub fn install_scrcpy() -> Result<PathBuf, String> {
     let target_dir = local_bin_dir();
     fs::create_dir_all(&target_dir)
@@ -232,7 +369,6 @@ Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $extractTmp
 
     let mut cmd = Command::new("powershell");
     cmd.args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &script]);
-    #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
 
     let out = cmd
@@ -255,6 +391,89 @@ Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $extractTmp
     } else {
         Err("scrcpy.exe tidak ditemukan setelah ekstrak.".to_string())
     }
+}
+
+#[cfg(target_os = "linux")]
+pub fn install_scrcpy() -> Result<PathBuf, String> {
+    if !cfg!(target_arch = "x86_64") {
+        return Err(
+            "Auto-install Linux hanya untuk x86_64. Install via package manager (mis. sudo apt install scrcpy adb)."
+                .to_string(),
+        );
+    }
+
+    let target_dir = local_bin_dir();
+    fs::create_dir_all(&target_dir)
+        .map_err(|e| format!("Gagal membuat folder {}: {e}", target_dir.display()))?;
+
+    let target_str = target_dir.to_string_lossy().replace('\'', "'\\''");
+    let script = format!(
+        r#"
+set -e
+url=$(curl -fsSL -H 'User-Agent: android-mirror-app' 'https://api.github.com/repos/Genymobile/scrcpy/releases/latest' | grep -oE 'https://[^"]+scrcpy-linux-x86_64-v[^"]+\.tar\.gz' | head -n 1)
+if [ -z "$url" ]; then
+  echo "Asset scrcpy-linux-x86_64 tidak ditemukan." >&2
+  exit 1
+fi
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+curl -fsSL "$url" -o "$tmp/scrcpy.tar.gz"
+tar -xzf "$tmp/scrcpy.tar.gz" -C "$tmp" --strip-components=1
+cp -a "$tmp"/. '{target_str}/'
+chmod +x '{target_str}/scrcpy' '{target_str}/adb' 2>/dev/null || true
+"#
+    );
+
+    let out = Command::new("sh")
+        .args(["-c", &script])
+        .output()
+        .map_err(|e| format!("Gagal menjalankan shell installer: {e}"))?;
+
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        return Err(format!(
+            "Download scrcpy gagal ({err}). Alternatif: install via apt/pacman/dnf."
+        ));
+    }
+
+    let bin = target_dir.join("scrcpy");
+    if bin.is_file() {
+        Ok(bin)
+    } else {
+        Err("Binary scrcpy tidak ditemukan setelah ekstrak.".to_string())
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub fn install_scrcpy() -> Result<PathBuf, String> {
+    let brew = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
+        .into_iter()
+        .map(PathBuf::from)
+        .find(|p| p.is_file())
+        .or_else(|| which("brew"))
+        .ok_or_else(|| {
+            "Homebrew tidak ditemukan. Jalankan `brew install scrcpy android-platform-tools` di Terminal."
+                .to_string()
+        })?;
+
+    let out = Command::new(&brew)
+        .args(["install", "scrcpy", "android-platform-tools"])
+        .output()
+        .map_err(|e| format!("Gagal menjalankan brew: {e}"))?;
+
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        return Err(format!("brew install scrcpy gagal: {err}"));
+    }
+
+    find_scrcpy().ok_or_else(|| {
+        "scrcpy terpasang via Homebrew tetapi binary tidak ditemukan di PATH.".to_string()
+    })
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+pub fn install_scrcpy() -> Result<PathBuf, String> {
+    Err("Auto-install scrcpy belum didukung di OS ini.".to_string())
 }
 
 fn get_wifi_ip(adb: &Path, serial: &str) -> Result<String, String> {
